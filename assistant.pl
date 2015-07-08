@@ -1,8 +1,10 @@
 #!/usr/bin/env perl
 ## An assistant that runs a Threes AI for the purposes of assisting the player play the actual game of Threes.
 use 5.010;
+use lib './lib';
 
-my $_bot = Games::Threesus::Core::Bots::StandardBotFramework->new(6, 3, 'BoardQualityEvaluators.OpennessMatthew');
+my $_open = Games::Threesus::Core::Bots::BoardQualityEvaluators->new;
+my $_bot  = Games::Threesus::Core::Bots::StandardBotFramework->new(6, 3, \&{$_open->OpennessMatthew});
 
 # Main application entry point.
 # Build the board and initialize the deck.
