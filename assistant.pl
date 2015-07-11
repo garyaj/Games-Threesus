@@ -1,27 +1,30 @@
 #!/usr/bin/env perl
 ## An assistant that runs a Threes AI for the purposes of assisting the player play the actual game of Threes.
-use 5.010;
+use v5.14;
 use lib './lib';
+use Games::Threesus::Core::Bots::BotFramework;
+use Games::Threesus::Core::CoreGame::Deck;
+use Games::Threesus::Core::CoreGame::Board;
+use Data::Dumper;
 
-my $_open = Games::Threesus::Core::Bots::BoardQualityEvaluators->new;
-my $_bot  = Games::Threesus::Core::Bots::StandardBotFramework->new(6, 3, \&{$_open->OpennessMatthew});
+my $_bot = Games::Threesus::Core::Bots::BotFramework->new;
 
 # Main application entry point.
 # Build the board and initialize the deck.
-my $deck = Games::Threesus::Core::CoreGame::Deck->new(Games::Threesus::Core::Rand->new());
-my $board = Games::Threesus::Core::CoreGame::Board->new();
+my $deck = Games::Threesus::Core::CoreGame::Deck->new;
+my $board = Games::Threesus::Core::CoreGame::Board->new;
 say("Let's initialize the board...");
 say("The format for each line should be four characters, each a 1, 2, 3, or any other character to represent an empty space.");
-for (my $y = 0; $y < $board->Height; $y++) {
+for my $y (0 .. $board->Height) {
   printf("Enter row %d: ", $y);
-  my $rowStr = <>;
-  if($rowStr->Length != $board->Width) {
+  my $rowStr = chomp(<>);
+  if(length($rowStr->Length) != $board->Width) {
     say("Invalid length of entered row.");
     $y--;
     continue;
   }
 
-  for (my $x = 0; $x < $board->Width; $x++) {
+  for my $x (0 .. $board->Width) {
     my $card = GetCardFromChar(substr($rowStr,$x,1), 0);
     if ($card) {
       $board->[$x][$y] = $card;
@@ -173,10 +176,10 @@ sub GetNextCardHint {
 # Returns the shift direction as specified by the specified string, or null if none was specified.
 # If the string has no length, then the defaultDir will be returned.
 sub GetShiftDirection {
-  my ($str, $defaultDir) = @_;
-  if (!$str) {
+  my ($c, $defaultDir) = @_;
+  if (!$c) {
     return $defaultDir;
-  } elsif (length($str) > 1) {
+  } elsif (length($c) > 1) {
     return '';
   } else {
     if ($c eq 'l') { return 'Left'; }

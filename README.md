@@ -10,7 +10,7 @@ I don't expect the Perl code (initially) to run within an order of magnitude as 
 
 ## Getting started ##
 
-This code should run in any version of Perl >= 5.10 (i.e. any Perl version in the last ten years).
+This code should run in any version of Perl >= 5.14.
 
 Download the repo (git clone or ZIP file), fire up a Threes! game on your iPhone or iPad, start the Assistant
 by typing: perl assistant.pl and follow the instructions for the game.
