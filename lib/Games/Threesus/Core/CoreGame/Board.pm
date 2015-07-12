@@ -2,7 +2,7 @@
 # This version is much faster than the normal Board class, but doesn't contain unique Card IDs.
 package Games::Threesus::Core::CoreGame::Board;
 use Moo;
-use Tiny::Types qw(Str Int ArrayRef);
+use Type::Tiny qw(Str Int ArrayRef);
 use strictures 1;
 use namespace::clean;
 use Games::Threesus::Core::Bots::FastLookups;
@@ -226,9 +226,10 @@ sub GetMaxCardIndex {
   my $self = shift;
   my $max = 0;
   for my $x ( 0 .. $self->Width) {
-  for my $y ( 0 .. $self->Height) {
-    my $ix = $self->GetCardIndex($x, $y);
-    $max = $ix > $max ? $ix : $max;
+    for my $y ( 0 .. $self->Height) {
+      my $ix = $self->GetCardIndex($x, $y);
+      $max = $ix > $max ? $ix : $max;
+    }
   }
   return $max;
 }
@@ -238,8 +239,8 @@ sub ToString {
   my $self = shift;
   my @vals;
   my $str = '';
-  for my $y ( 0 .. $self->Height) {
-    for my $x ( 0 .. $self->Width) {
+  for my $y ( 0 .. $self->Height-1) {
+    for my $x ( 0 .. $self->Width-1) {
       my $cardIndex = $self->GetCardIndex($x, $y);
       my $value = $self->FLU->CARD_INDEX_TO_VALUE[$cardIndex];
       push @vals, $value;
@@ -800,7 +801,7 @@ sub ShiftDown {
 sub CanCardsMerge {
   my ($self, $sourceCardIndex, $destCardIndex) = @_;
   my $arrayLookup = $sourceCardIndex | ($destCardIndex << 4);
-  return $self->DEST_SHIFT_RESULTS[$arrayLookup] != destCardIndex;
+  return $self->DEST_SHIFT_RESULTS[$arrayLookup] != $destCardIndex;
 }
 
 1;

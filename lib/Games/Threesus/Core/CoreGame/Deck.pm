@@ -5,7 +5,7 @@ use MooX::Types::MooseLike::Base qw(:all);
 use strictures 1;
 use namespace::clean;
 
-my $INITIAL_CARD_VALUES = [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3];
+use constant INITIAL_CARD_VALUES => qw(1 1 1 1 2 2 2 2 3 3 3 3);
 
 has _cardValues => (isa => ArrayRef[InstanceOf['Card']], is => 'rw', default => sub {[]});
 
@@ -26,7 +26,7 @@ sub PeekNextCard {
   if ($self->_cardValues == 0) {
     $self->RebuildDeck();
   }
-  return $self->_cardValues[-1];
+  return $self->_cardValues->[-1];
 }
 
 # Returns a dictionary with card values as keys for the number of cards of that value.
@@ -36,9 +36,9 @@ sub GetCountsOfCards {
     $self->RebuildDeck();
   }
 
-  $ret = {};
+  my $ret = {};
   for my $i (0 .. $self->_cardValues) {
-    my $value = $self->_cardValues->[i];
+    my $value = $self->_cardValues->[$i];
     my $count;
     if (exists $ret->{$value}) {
       $ret->{$value}++;
@@ -65,7 +65,7 @@ sub RebuildDeck {
   my $self = shift;
   #Debug.Assert(_cardValues.Count == 0);
 
-  $self->_cardValues.AddRange(INITIAL_CARD_VALUES);
+  $self->_cardValues(INITIAL_CARD_VALUES);
   fisher_yates_shuffle($self->_cardValues);
 }
 

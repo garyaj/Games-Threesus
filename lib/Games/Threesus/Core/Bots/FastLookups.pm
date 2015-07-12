@@ -1,7 +1,7 @@
 # Contains fast lookup arrays by card number.
 package Games::Threesus::Core::Bots::FastLookups;
 use Moo;
-use Tiny::Types qw(Str Int ArrayRef);
+use Types::Standard qw(Str Int ArrayRef HashRef);
 use strictures 1;
 use namespace::clean;
 
@@ -52,7 +52,7 @@ has CARD_VALUE_TO_INDEX => (is => 'ro', isa => HashRef, builder => '_build_fast_
 sub _build_fast_lu {
   my $self = shift;
   for my $cardIndex ( 0 .. length(CARD_INDEX_TO_VALUE)-1) {
-    $self->CARD_VALUE_TO_INDEX->{CARD_INDEX_TO_VALUE[$cardIndex]} = $cardIndex;
+    $self->CARD_VALUE_TO_INDEX((CARD_INDEX_TO_VALUE)[$cardIndex] => $cardIndex);
   }
 }
 1;

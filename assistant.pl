@@ -15,7 +15,7 @@ my $deck = Games::Threesus::Core::CoreGame::Deck->new;
 my $board = Games::Threesus::Core::CoreGame::Board->new;
 say("Let's initialize the board...");
 say("The format for each line should be four characters, each a 1, 2, 3, or any other character to represent an empty space.");
-for my $y (0 .. $board->Height) {
+for my $y (0 .. $board->Height-1) {
   printf("Enter row %d: ", $y);
   my $rowStr = chomp(<>);
   if(length($rowStr->Length) != $board->Width) {
@@ -24,7 +24,7 @@ for my $y (0 .. $board->Height) {
     continue;
   }
 
-  for my $x (0 .. $board->Width) {
+  for my $x (0 .. $board->Width-1) {
     my $card = GetCardFromChar(substr($rowStr,$x,1), 0);
     if ($card) {
       $board->[$x][$y] = $card;
