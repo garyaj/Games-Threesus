@@ -5,7 +5,9 @@ use lib './lib';
 use Games::Threesus::Core::Bots::BotFramework;
 use Games::Threesus::Core::CoreGame::Deck;
 use Games::Threesus::Core::CoreGame::Board;
+use Games::Threesus::Core::CoreGame::Game;
 use Data::Dumper;
+use enum qw(One Two Three Bonus);
 
 my $_bot = Games::Threesus::Core::Bots::BotFramework->new;
 
@@ -13,6 +15,7 @@ my $_bot = Games::Threesus::Core::Bots::BotFramework->new;
 # Build the board and initialize the deck.
 my $deck = Games::Threesus::Core::CoreGame::Deck->new;
 my $board = Games::Threesus::Core::CoreGame::Board->new;
+$board->Initialise; #Initialise fast lookup arrays
 say("Let's initialize the board...");
 say("The format for each line should be four characters, each a 1, 2, 3, or any other character to represent an empty space.");
 for my $y (0 .. $board->Height-1) {
@@ -75,7 +78,7 @@ redo:
 
   # Choose a move.
   print("Thinking...");
-  my $aiDir = $_bot->GetNextMove(FastBoard->new($board), FastDeck->new($deck), $nextCardHint);
+  my $aiDir = $_bot->GetNextMove(FastBoard->new(Board => $board), FastDeck->new(Deck => $deck), $nextCardHint);
   if ($aiDir) {
     printf("\nSWIPE %s.\n", $aiDir);
   } else {
@@ -127,7 +130,7 @@ redo:
 
   # Get new card value.
   my $newCardValue;
-  if ($nextCardHint eq 'Bonus') {
+  if ($nextCardHint == Bonus) {
     do {
       print("!!! What is the value of the new card? ");
     } unless ($newCardValue = GetNewCardValue());
@@ -135,7 +138,7 @@ redo:
     $newCardValue = $nextCardHint + 1;
   }
   $deck->RemoveCard($newCardValue);
-  $board->[$newCardCells->[$newCardIndex]] = Card->new($newCardValue, -1);
+  $board->[$newCardCells->[$newCardIndex]] = Card->new((Value => $newCardValue, UniqeID => -1);
 
   push @$boardsStack, Board->new($board);
   push @$decksStack, Deck->new($deck);
@@ -148,14 +151,14 @@ exit;
 sub GetCardFromChar {
   my ($c, $allowBonusCard) = @_;
     if ($c eq '1') {
-      return Card->new(1, -1);
+      return Card->new(Value => 1, UniqeID => -1);
     } elsif ($c eq '2') {
-      return Card->new(2, -2);
+      return Card->new(Value => 2, UniqeID => -2);
     } elsif ($c eq '3') {
-      return Card->new(3, -1);
+      return Card->new(Value => 3, UniqeID => -1);
     } elsif ($c eq '+') {
       if ($allowBonusCard) {
-        return Card->new(-1, -1);
+        return Card->new(Value => -1, UniqeID => -1);
       } else {
         return;
       }
@@ -166,30 +169,30 @@ sub GetCardFromChar {
 
 # Returns the NextCardHint given the specified next card.
 sub GetNextCardHint {
-  if ($_[0] == 1) { return 'One'; }
-  if ($_[0] == 2) { return 'Two'; }
-  if ($_[0] == 3) { return 'Three'; }
+  if ($_[0] == 1) { return One; }
+  if ($_[0] == 2) { return Two; }
+  if ($_[0] == 3) { return Three; }
   # else
-  return 'Bonus';
+  return Bonus;
 }
 
 # Returns the shift direction as specified by the specified string, or null if none was specified.
 # If the string has no length, then the defaultDir will be returned.
-sub GetShiftDirection {
-  my ($c, $defaultDir) = @_;
-  if (!$c) {
-    return $defaultDir;
-  } elsif (length($c) > 1) {
-    return '';
-  } else {
-    if ($c eq 'l') { return 'Left'; }
-    if ($c eq 'r') { return 'Right'; }
-    if ($c eq 'u') { return 'Up'; }
-    if ($c eq 'd') { return 'Down'; }
-    #else
-    return '';
-  }
-}
+# sub GetShiftDirection {
+#   my ($c, $defaultDir) = @_;
+#   if (!$c) {
+#     return $defaultDir;
+#   } elsif (length($c) > 1) {
+#     return '';
+#   } else {
+#     if ($c eq 'l') { return 'Left'; }
+#     if ($c eq 'r') { return 'Right'; }
+#     if ($c eq 'u') { return 'Up'; }
+#     if ($c eq 'd') { return 'Down'; }
+#     #else
+#     return '';
+#   }
+# }
 
 # Attempts to extract the value of a new card from the specified string.
 sub GetNewCardValue {

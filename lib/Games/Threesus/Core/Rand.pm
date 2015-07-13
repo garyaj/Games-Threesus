@@ -1,5 +1,5 @@
-use 5.010;
 package Games::Threesus::Core::Rand;
+use v5.14;
 use Moo;
 use strictures 1;
 use namespace::clean;

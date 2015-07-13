@@ -1,11 +1,11 @@
 # Stores a snapshot of the state of the game board.
 # This version is much faster than the normal Board class, but doesn't contain unique Card IDs.
 package Games::Threesus::Core::CoreGame::Board;
+use v5.14;
 use Moo;
 use Type::Tiny qw(Str Int ArrayRef);
 use strictures 1;
 use namespace::clean;
-use Games::Threesus::Core::Bots::FastLookups;
 use Games::Threesus::Core::V2D;
 
 # Masks used to access a particular cell in the _board variable.

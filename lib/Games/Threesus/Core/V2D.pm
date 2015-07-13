@@ -1,5 +1,6 @@
 # Stores a 2-dimensional point or displacement in space as two integer values.
 package Games::Threesus::Core::V2D;
+use v5.14;
 use Moo;
 use Types::Standard qw(Str Int ArrayRef HashRef);
 use strictures 1;

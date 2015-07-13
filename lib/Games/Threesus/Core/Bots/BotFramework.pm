@@ -2,6 +2,7 @@
 package Games::Threesus::Core::Bots::BotFramework;
 use v5.14;
 use Moo;
+# use Games::Threesus::Core::CoreGame::Game;
 use namespace::clean;
 use enum qw(Left Right Up Down);
 use enum qw(One Two Three Bonus);
@@ -11,20 +12,17 @@ has moveSearchDepth => ( is => 'ro', default => 6);
 # The number of moves into the future in which the deck should be "card counted"
 has cardCountDepth => ( is => 'ro', default => 3);
 
-# Keep an instance of a Game available.
-has game => ( is => 'ro');
-
 # Returns the next move to make based on the state of the specified game, or null to make no move.
 sub GetNextMove {
   my ($self, $board, $deck, $nextCardHint, $movesEvaluated) = @_;
   $movesEvaluated //= 0;
   my $knownNextCardIndex;
-  for ($nextCardHint) {
-    $knownNextCardIndex = 1 when /One/;
-    $knownNextCardIndex = 2 when /Two/;
-    $knownNextCardIndex = 3 when /Three/;
-    $knownNextCardIndex = "Bonus" when /Bonus/;
-    default {die "Unknown NextCardHint '$nextCardHint'."};
+  given ($nextCardHint) {
+    when (/One/) { $knownNextCardIndex = 1 }
+    when (/Two/) { $knownNextCardIndex = 2 }
+    when (/Three/) { $knownNextCardIndex = 3 }
+    when (/Bonus/) { $knownNextCardIndex = "Bonus" }
+    default {die "Unknown NextCardHint '$nextCardHint'."}
   }
   my $quality;
   return $self->GetBestMoveForBoard($board, $deck, $knownNextCardIndex, $self->moveSearchDepth - 1, \$quality, $movesEvaluated);
@@ -32,7 +30,7 @@ sub GetNextMove {
 
 # Returns the string representation of this Framework.
 sub ToString {
-  my $self = shift;
+  my ($self) = @_;
   return sprintf("Bot Framework\nMove Search Depth: %d\nCard Count Depth: %d\nEvaluator: %s",
     $self->moveSearchDepth,
     $self->cardCountDepth,
@@ -81,7 +79,7 @@ sub EvaluateMoveForBoard {
     $totalWeight = 0;
 
     if( $knownNextCardIndex eq 'Bonus') {
-      my $indexes = $self->game->GetPossibleBonusCardIndexes($board->GetMaxCardIndex);
+      my $indexes = Game->new->GetPossibleBonusCardIndexes($board->GetMaxCardIndex);
       for my $i ( 0 .. $#{$indexes}) {
         my $cardIndex = $indexes->[$i];
         for my $j (0 .. 4) {
@@ -89,7 +87,7 @@ sub EvaluateMoveForBoard {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
-          $newBoard->SetCardIndex($cell, $cardIndex);
+          $newBoard->SetCardIndexFromCell($cell, $cardIndex);
 
           my $quality;
           if ($recursionsLeft == 0
@@ -110,7 +108,7 @@ sub EvaluateMoveForBoard {
         next if ($cell->X < 0);
 
         my $newBoard = $shiftedBoard;
-        $newBoard->SetCardIndex($cell, $knownNextCardIndex);
+        $newBoard->SetCardIndexFromCell($cell, $knownNextCardIndex);
 
         my $quality;
         if ($recursionsLeft == 0
@@ -131,7 +129,7 @@ sub EvaluateMoveForBoard {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
-          $newBoard->SetCardIndex($cell, 1);
+          $newBoard->SetCardIndexFromCell($cell, 1);
 
           my $quality;
           if ($recursionsLeft == 0
@@ -153,7 +151,7 @@ sub EvaluateMoveForBoard {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
-          $newBoard->SetCardIndex($cell, 2);
+          $newBoard->SetCardIndexFromCell($cell, 2);
 
           my $quality;
           if ($recursionsLeft == 0
@@ -174,7 +172,7 @@ sub EvaluateMoveForBoard {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
-          $newBoard->SetCardIndex($cell, 3);
+          $newBoard->SetCardIndexFromCell($cell, 3);
 
           my $quality;
           if ($recursionsLeft == 0

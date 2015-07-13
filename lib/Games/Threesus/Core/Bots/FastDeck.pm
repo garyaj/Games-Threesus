@@ -1,5 +1,6 @@
 # Stores count totals of the current deck for the purpose of counting cards. 
 package Games::Threesus::Core::Bots::FastDeck;
+use v5.14;
 use Moo;
 use MooX::Types::MooseLike::Base qw(:all);
 use strictures 1;
@@ -8,7 +9,7 @@ use namespace::clean;
 has Ones   => ( is => 'rw' );
 has Twos   => ( is => 'rw' );
 has Threes => ( is => 'rw' );
-has cardCounts => (isa => HashRef[InstanceOf['Card']], is => 'rw', default => sub {[]});
+has cardCounts => (isa => HashRef[Int], is => 'rw', default => sub {[]});
 
 
 # Initializes the counts in a new FastDeck to the card counts in the specified Deck.

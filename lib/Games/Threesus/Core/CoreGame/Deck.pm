@@ -1,5 +1,6 @@
 # Manages a randomly-shuffled deck of card values.
 package Games::Threesus::Core::CoreGame::Deck;
+use v5.14;
 use Moo;
 use MooX::Types::MooseLike::Base qw(:all);
 use strictures 1;
