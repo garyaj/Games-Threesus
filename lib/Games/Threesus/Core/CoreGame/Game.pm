@@ -2,6 +2,8 @@
 package Games::Threesus::Core::CoreGame::Game;
 use v5.14;
 use Moo;
+use Types::Standard qw(Str Int ArrayRef HashRef);
+use Games::Threesus::Core::CoreGame::Board;
 use strictures 1;
 use namespace::clean;
 
@@ -11,9 +13,9 @@ use enum qw(One Two Three Bonus);
 
 has _rand => (is => 'ro');
 has _deck => (is => 'ro');
-has _board => (is => 'ro');
-has _prevBoard => (is => 'ro');
-has _tempBoard => (is => 'ro');
+has _board => (is => 'ro', isa => Str);
+has _prevBoard => (is => 'ro', isa => Str);
+has _tempBoard => (is => 'ro', isa => Str);
 has _nextCardID => (is => 'ro', default => 0);
 has _nextBonusCard => (is => 'ro');
 
@@ -39,12 +41,10 @@ sub CurrentDeck {
 sub NextCardHint {
   my ($self) = @_;
   my $nextCardValue = $self->_nextBonusCard // $self->_deck->PeekNextCard;
-  given ($nextCardValue) {
-    when (/^1/) { return One }
-    when (/^2/) { return Two }
-    when (/^3/) { return Three }
-    default {return Bonus}
-  }
+  if    ($nextCardValue == 1) { return One }
+  elsif ($nextCardValue == 2) { return Two }
+  elsif ($nextCardValue == 3) { return Three }
+  else  {return Bonus}
 }
 
 # Creates a new Game that uses the specified random number generator.
@@ -55,7 +55,7 @@ sub Initialize {
 
   InitializeBoard();
 
-  $self->_prevBoard = Board->new->CopyFrom(_board);
+  $self->_prevBoard = Board->new->CopyFrom($self->_board);
   $self->_tempboard = Board->new;
 }
 
@@ -68,7 +68,7 @@ sub Shift {
   my $shifted = $self->_board->ShiftInPlace($dir, $newCardCells);
   if ($shifted) {
     my $newCardCell = $newCardCells->[rand(scalar @$newCardCells)];
-    $self->_board[$newCardCell] = $self->DrawNextCard;
+    vec($self->_board, $newCardCell*4, 4) = $self->DrawNextCard;
 
     $self->_prevBoard = $self->_tempBoard;
   }
@@ -80,7 +80,7 @@ sub InitializeBoard {
   my ($self) = @_;
   for (1 .. NUM_INITIAL_CARDS) {
     my $cell = $self->GetRandomEmptyCell;
-    $self->_board[$cell] = $self->DrawNextCard;
+    vec($self->_board, $cell->X + 4 * $cell->Y, 4) = $self->DrawNextCard;
   }
 }
 
@@ -93,8 +93,9 @@ sub GetRandomEmptyCell {
       X => rand( $self->_board->Width),
       Y => rand( $self->_board->Height)
     );
-  }
-  while($self->_board[$ret]);
+  } while(
+    vec($self->_board, $ret->X + 4 * $ret->Y, 4) != 0
+  );
   return $ret;
 }
 
@@ -105,9 +106,9 @@ sub DrawNextCard {
 
   # Should the next card be a bonus card?
   my $maxCardValue = $self->_board->GetMaxCardValue;
-  if ($maxCardValue >= 48 && rand < BONUS_CARD_CHANCE) {
-    my $possibleBonusCards = $self->GetPossibleBonusCards($maxCardValue));
-    $self->_nextBonusCard = $possibleBonusCards[rand(scalar @{$possibleBonusCards})];
+  if ($maxCardValue >= 48 && (rand() < BONUS_CARD_CHANCE)) {
+    my $possibleBonusCards = $self->GetPossibleBonusCards($maxCardValue);
+    $self->_nextBonusCard = $possibleBonusCards->[rand(scalar @{$possibleBonusCards})];
   } else {
     $self->_nextBonusCard = 0;
   }

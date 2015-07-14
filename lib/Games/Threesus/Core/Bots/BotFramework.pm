@@ -2,9 +2,8 @@
 package Games::Threesus::Core::Bots::BotFramework;
 use v5.14;
 use Moo;
-# use Games::Threesus::Core::CoreGame::Game;
+use Types::Standard qw(Str Int ArrayRef);
 use namespace::clean;
-use enum qw(Left Right Up Down);
 use enum qw(One Two Three Bonus);
 
 # The number of moves into the future to examine. Should be at least 1.
@@ -12,20 +11,19 @@ has moveSearchDepth => ( is => 'ro', default => 6);
 # The number of moves into the future in which the deck should be "card counted"
 has cardCountDepth => ( is => 'ro', default => 3);
 
+
 # Returns the next move to make based on the state of the specified game, or null to make no move.
 sub GetNextMove {
   my ($self, $board, $deck, $nextCardHint, $movesEvaluated) = @_;
   $movesEvaluated //= 0;
   my $knownNextCardIndex;
-  given ($nextCardHint) {
-    when (/One/) { $knownNextCardIndex = 1 }
-    when (/Two/) { $knownNextCardIndex = 2 }
-    when (/Three/) { $knownNextCardIndex = 3 }
-    when (/Bonus/) { $knownNextCardIndex = "Bonus" }
-    default {die "Unknown NextCardHint '$nextCardHint'."}
-  }
+  if    ($nextCardHint == One)   { $knownNextCardIndex = 1 }
+  elsif ($nextCardHint == Two)   { $knownNextCardIndex = 2 }
+  elsif ($nextCardHint == Three) { $knownNextCardIndex = 3 }
+  elsif ($nextCardHint == Bonus) { $knownNextCardIndex = "Bonus" }
+  else {die "Unknown NextCardHint '$nextCardHint'."}
   my $quality;
-  return $self->GetBestMoveForBoard($board, $deck, $knownNextCardIndex, $self->moveSearchDepth - 1, \$quality, $movesEvaluated);
+  return $self->GetBestMoveForBoard($board, $deck, $knownNextCardIndex, $self->moveSearchDepth - 1, \$quality, \$movesEvaluated);
 }
 
 # Returns the string representation of this Framework.
@@ -40,13 +38,13 @@ sub ToString {
 # Returns the best move to make for the specified board, or null if there are no moves to make.
 # Outputs the quality of the returned move.
 sub GetBestMoveForBoard {
-  my ($self, $board, $deck, $knownNextCardIndex, $recursionsLeft, $moveQuality, $movesEvaluated) = @_;
-  my ($moves1, $moves2);
-  my $leftQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Left, $recursionsLeft, \$moves1);
-  my $rightQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Right, $recursionsLeft, \$moves1);
-  my $upQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Up, $recursionsLeft, \$moves2);
-  my $downQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Down, $recursionsLeft, \$moves2);
-  $movesEvaluated += $moves1 + $moves2;
+  my ($self, $board, $deck, $knownNextCardIndex, $recursionsLeft, $pmoveQuality, $pmovesEvaluated) = @_;
+  my ($moves1, $moves2) = (0, 0);
+  my $leftQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 0, $recursionsLeft, \$moves1);
+  my $rightQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 1, $recursionsLeft, \$moves1);
+  my $upQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 2, $recursionsLeft, \$moves2);
+  my $downQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 3, $recursionsLeft, \$moves2);
+  $$pmovesEvaluated += $moves1 + $moves2;
 
   my $bestQuality = $leftQuality;
   my $bestDir = $bestQuality ? "Left" : '';
@@ -62,14 +60,14 @@ sub GetBestMoveForBoard {
     $bestQuality = $downQuality;
     $bestDir = "Down";
   }
-  $moveQuality = $bestQuality;
+  $$pmoveQuality = $bestQuality;
   return $bestDir;
 }
 
 # Returns the quality value for shifting the specified board in the specified direction.
 # Returns null if shifting in that direction is not possible.
 sub EvaluateMoveForBoard {
-  my ($self, $board, $deck, $knownNextCardIndex, $dir, $recursionsLeft, $movesEvaluated) = @_;
+  my ($self, $board, $deck, $knownNextCardIndex, $dir, $recursionsLeft, $pmovesEvaluated) = @_;
   my $shiftedBoard = $board;
   my $totalQuality;
   my $totalWeight;
@@ -82,8 +80,7 @@ sub EvaluateMoveForBoard {
       my $indexes = Game->new->GetPossibleBonusCardIndexes($board->GetMaxCardIndex);
       for my $i ( 0 .. $#{$indexes}) {
         my $cardIndex = $indexes->[$i];
-        for my $j (0 .. 4) {
-          my $cell = $newCardCells->[$j];
+        for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
@@ -91,9 +88,9 @@ sub EvaluateMoveForBoard {
 
           my $quality;
           if ($recursionsLeft == 0
-            or $self->GetBestMoveForBoard($newBoard, $deck, 0, $recursionsLeft-1, \$quality, \$movesEvaluated) == 0) {
+            or $self->GetBestMoveForBoard($newBoard, $deck, 0, $recursionsLeft-1, \$quality, $pmovesEvaluated) == 0) {
             $quality = $self->evaluator($newBoard);
-            $movesEvaluated++;
+            $$pmovesEvaluated++;
           }
 
           $totalQuality += $quality;
@@ -103,8 +100,7 @@ sub EvaluateMoveForBoard {
     } elsif ($knownNextCardIndex > 0) {
       my $newDeck = $deck;
       $newDeck->Remove($knownNextCardIndex);
-      for my $i (0 .. 4) {
-        my $cell = $newCardCells->[$i];
+      for my $cell (@{$newCardCells}) {
         next if ($cell->X < 0);
 
         my $newBoard = $shiftedBoard;
@@ -112,9 +108,9 @@ sub EvaluateMoveForBoard {
 
         my $quality;
         if ($recursionsLeft == 0
-          or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft-1, \$quality, \$movesEvaluated) == 0) {
+          or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft-1, \$quality, $pmovesEvaluated) == 0) {
           $quality = $self->evaluator($newBoard);
-          $movesEvaluated++;
+          $$pmovesEvaluated++;
         }
 
         $totalQuality += $quality;
@@ -124,8 +120,7 @@ sub EvaluateMoveForBoard {
       if ($deck->Ones > 0) {
         my $newDeck = $deck;
         $newDeck->RemoveOne;
-        for my $i (0 .. 4) {
-          my $cell = $newCardCells->[$i];
+        for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
@@ -133,9 +128,9 @@ sub EvaluateMoveForBoard {
 
           my $quality;
           if ($recursionsLeft == 0
-            or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft - 1, \$quality, \$movesEvaluated) == 0) {
+            or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft - 1, \$quality, $pmovesEvaluated) == 0) {
             $quality = $self->evaluator($newBoard);
-            $movesEvaluated++;
+            $$pmovesEvaluated++;
           }
 
           $totalQuality += $quality * $deck->Ones;
@@ -146,8 +141,7 @@ sub EvaluateMoveForBoard {
       if ($deck->Twos > 0) {
         my $newDeck = $deck;
         $newDeck->RemoveTwo;
-        for my $i (0 .. 4) {
-          my $cell = $newCardCells->[$i];
+        for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
@@ -155,9 +149,9 @@ sub EvaluateMoveForBoard {
 
           my $quality;
           if ($recursionsLeft == 0
-            or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft - 1, \$quality, \$movesEvaluated) == 0) {
+            or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft - 1, \$quality, $pmovesEvaluated) == 0) {
             $quality = $self->evaluator($newBoard);
-            $movesEvaluated++;
+            $$pmovesEvaluated++;
           }
 
           $totalQuality += $quality * $deck->Twos;
@@ -167,8 +161,7 @@ sub EvaluateMoveForBoard {
       if ($deck->Threes > 0) {
         my $newDeck = $deck;
         $newDeck->RemoveThree;
-        for my $i (0 .. 4) {
-          my $cell = $newCardCells->[$i];
+        for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
           my $newBoard = $shiftedBoard;
@@ -176,9 +169,9 @@ sub EvaluateMoveForBoard {
 
           my $quality;
           if ($recursionsLeft == 0
-            or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft - 1, \$quality, \$movesEvaluated) == 0) {
+            or $self->GetBestMoveForBoard($newBoard, $newDeck, 0, $recursionsLeft - 1, \$quality, $pmovesEvaluated) == 0) {
             $quality = $self->evaluator($newBoard);
-            $movesEvaluated++;
+            $$pmovesEvaluated++;
           }
 
           $totalQuality += $quality * $deck->Threes;
@@ -189,18 +182,16 @@ sub EvaluateMoveForBoard {
     } else {
       my $quality;
       if ($recursionsLeft == 0
-        or $self->GetBestMoveForBoard($shiftedBoard, $deck, 0, $recursionsLeft - 1, \$quality, \$movesEvaluated) == 0) {
+        or $self->GetBestMoveForBoard($shiftedBoard, $deck, 0, $recursionsLeft - 1, \$quality, $pmovesEvaluated) == 0) {
         $quality = $self->evaluator($shiftedBoard);
-        $movesEvaluated++;
+        $$pmovesEvaluated++;
       }
-
       $totalQuality += $quality;
       $totalWeight += 1;
     }
-
     return $totalQuality/$totalWeight;
   } else {
-    return;
+    return 0.0;
   }
 }
 
@@ -289,8 +280,9 @@ sub evaluator {
 # Is a coordinate neighbors with a specific index?
 sub NeighborsWith {
   my ($self, $board, $x, $y, $index, $testX, $testY) = @_;
+  $x //= 0; $y //= 0;
   my $leftCardIndex = $x > 0 ? $board->GetCardIndex($x - 1, $y) : 0;
-  my $rightCardIndex = $x < $board->Width - 1 ? board->GetCardIndex($x + 1, $y) : 0;
+  my $rightCardIndex = $x < $board->Width - 1 ? $board->GetCardIndex($x + 1, $y) : 0;
   my $upCardIndex = $y > 0 ? $board->GetCardIndex($x, $y - 1) : 0;
   my $downCardIndex = $y < $board->Height - 1 ? $board->GetCardIndex($x, $y + 1) : 0;
 
