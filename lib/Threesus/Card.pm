@@ -1,5 +1,5 @@
 # Represents a single card in the game.
-package Games::Threesus::Core::CoreGame::Card;
+package Threesus::Card;
 use v5.14;
 use Moo;
 use strictures 1;

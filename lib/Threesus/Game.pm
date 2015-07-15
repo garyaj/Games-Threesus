@@ -1,9 +1,9 @@
 # Manages the current state and rules of the game.
-package Games::Threesus::Core::CoreGame::Game;
+package Threesus::Game;
 use v5.14;
 use Moo;
 use Types::Standard qw(Str Int ArrayRef HashRef);
-use Games::Threesus::Core::CoreGame::Board;
+use Threesus::Board;
 use strictures 1;
 use namespace::clean;
 

@@ -19,9 +19,9 @@ use v5.14;
 use lib './lib';
 
 use Test::More tests => 5;                      # last test to print
-require_ok( 'Games::Threesus::Core::V2D' );
+require_ok( 'Threesus::V2D' );
 
-my $v = new_ok('Games::Threesus::Core::V2D' =>[X => 1, Y => 2]);
+my $v = new_ok('Threesus::V2D' =>[X => 1, Y => 2]);
 ok($v->X == 1, 'Got X');
 ok($v->Y == 2, 'Got Y');
 $v->X(4);

@@ -1,5 +1,5 @@
 # Manages a randomly-shuffled deck of card values.
-package Games::Threesus::Core::CoreGame::Deck;
+package Threesus::Deck;
 use v5.14;
 use Moo;
 use Types::Standard qw(Str Int ArrayRef HashRef);

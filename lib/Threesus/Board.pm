@@ -1,12 +1,12 @@
 # Stores a snapshot of the state of the game board.
 # This version is much faster than the normal Board class, but doesn't contain unique Card IDs.
-package Games::Threesus::Core::CoreGame::Board;
+package Threesus::Board;
 use v5.14;
 use Moo;
 use Types::Standard qw(Str Int ArrayRef HashRef);
 use strictures 1;
 use namespace::clean;
-use Games::Threesus::Core::V2D;
+use Threesus::V2D;
 
 # Contains fast lookup arrays by card number.
 # Looks up the face value of a card by its 4-bit index.
@@ -215,9 +215,9 @@ sub ShiftLeft {
       vec($newBoard, $i, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => 3, Y => 0);
+      $newCardCells->[0] = Threesus::V2D->new(X => 3, Y => 0);
     } else {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -246,9 +246,9 @@ sub ShiftLeft {
       vec($newBoard, $i+4, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => 3, Y => 1);
+      $newCardCells->[1] = Threesus::V2D->new(X => 3, Y => 1);
     } else {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -277,9 +277,9 @@ sub ShiftLeft {
       vec($newBoard, $i+8, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => 3, Y => 2);
+      $newCardCells->[2] = Threesus::V2D->new(X => 3, Y => 2);
     } else {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -308,9 +308,9 @@ sub ShiftLeft {
       vec($newBoard, $i+12, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => 3, Y => 3);
+      $newCardCells->[3] = Threesus::V2D->new(X => 3, Y => 3);
     } else {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
   $self->_board($newBoard);
@@ -345,9 +345,9 @@ sub ShiftRight {
       vec($newBoard, $i, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => 0, Y => 0);
+      $newCardCells->[0] = Threesus::V2D->new(X => 0, Y => 0);
     } else {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -376,9 +376,9 @@ sub ShiftRight {
       vec($newBoard, $i+4, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => 0, Y => 1);
+      $newCardCells->[1] = Threesus::V2D->new(X => 0, Y => 1);
     } else {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -407,9 +407,9 @@ sub ShiftRight {
       vec($newBoard, $i+8, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => 0, Y => 2);
+      $newCardCells->[2] = Threesus::V2D->new(X => 0, Y => 2);
     } else {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -438,9 +438,9 @@ sub ShiftRight {
       vec($newBoard, $i+12, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => 0, Y => 3);
+      $newCardCells->[3] = Threesus::V2D->new(X => 0, Y => 3);
     } else {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
   $self->_board($newBoard);
@@ -475,9 +475,9 @@ sub ShiftUp {
       vec($newBoard, $i*4, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => 0, Y => 3);
+      $newCardCells->[0] = Threesus::V2D->new(X => 0, Y => 3);
     } else {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -506,9 +506,9 @@ sub ShiftUp {
       vec($newBoard, $i*4+1, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => 1, Y => 3);
+      $newCardCells->[1] = Threesus::V2D->new(X => 1, Y => 3);
     } else {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -537,9 +537,9 @@ sub ShiftUp {
       vec($newBoard, $i*4+2, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => 2, Y => 3);
+      $newCardCells->[2] = Threesus::V2D->new(X => 2, Y => 3);
     } else {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -568,9 +568,9 @@ sub ShiftUp {
       vec($newBoard, $i*4+3, 4) = $cellIndex[$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => 3, Y => 3);
+      $newCardCells->[3] = Threesus::V2D->new(X => 3, Y => 3);
     } else {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
   $self->_board($newBoard);
@@ -605,9 +605,9 @@ sub ShiftDown {
       vec($newBoard, $i*4, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => 0, Y => 0);
+      $newCardCells->[0] = Threesus::V2D->new(X => 0, Y => 0);
     } else {
-      $newCardCells->[0] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -636,9 +636,9 @@ sub ShiftDown {
       vec($newBoard, $i*4+1, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => 1, Y => 0);
+      $newCardCells->[1] = Threesus::V2D->new(X => 1, Y => 0);
     } else {
-      $newCardCells->[1] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -667,9 +667,9 @@ sub ShiftDown {
       vec($newBoard, $i*4+2, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => 2, Y => 0);
+      $newCardCells->[2] = Threesus::V2D->new(X => 2, Y => 0);
     } else {
-      $newCardCells->[2] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
 
@@ -698,9 +698,9 @@ sub ShiftDown {
       vec($newBoard, $i*4+3, 4) = $cellIndex[3-$i];
     }
     if ($prevBoard ne $newBoard) {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => 3, Y => 0);
+      $newCardCells->[3] = Threesus::V2D->new(X => 3, Y => 0);
     } else {
-      $newCardCells->[3] = Games::Threesus::Core::V2D->new(X => -1, Y => -1);
+      $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
   $self->_board($newBoard);

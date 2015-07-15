@@ -2,23 +2,23 @@
 ## An assistant that runs a Threes AI for the purposes of assisting the player play the actual game of Threes.
 use v5.14;
 use lib './lib';
-use Games::Threesus::Core::CoreGame::Board;
-use Games::Threesus::Core::CoreGame::Card;
-use Games::Threesus::Core::CoreGame::Deck;
-use Games::Threesus::Core::CoreGame::Game;
-use Games::Threesus::Core::Bots::FastDeck;
-use Games::Threesus::Core::Bots::BotFramework;
+use Threesus::Board;
+use Threesus::Card;
+use Threesus::Deck;
+use Threesus::Game;
+use Threesus::FastDeck;
+use Threesus::BotFramework;
 use Data::Dumper;
 
-my $_bot = Games::Threesus::Core::Bots::BotFramework->new;
+my $_bot = Threesus::BotFramework->new;
 
 # Main application entry point.
 # Build the board and initialize the deck.
-my $deck = Games::Threesus::Core::CoreGame::Deck->new;
+my $deck = Threesus::Deck->new;
 $deck->RebuildDeck;
-my $fd = Games::Threesus::Core::Bots::FastDeck->new;
+my $fd = Threesus::FastDeck->new;
 $fd->Initialize;
-my $board = Games::Threesus::Core::CoreGame::Board->new;
+my $board = Threesus::Board->new;
 $board->Initialize;    #Initialise fast lookup arrays
 say("Let's initialize the board...");
 say(

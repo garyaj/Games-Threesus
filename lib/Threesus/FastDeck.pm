@@ -1,5 +1,5 @@
 # Stores count totals of the current deck for the purpose of counting cards. 
-package Games::Threesus::Core::Bots::FastDeck;
+package Threesus::FastDeck;
 use v5.14;
 use Moo;
 use Types::Standard qw(Str Int ArrayRef HashRef);

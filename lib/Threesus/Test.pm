@@ -1,4 +1,4 @@
-package Games::Threesus::Test;
+package Threesus::Test;
 use v5.14;
 
 1;

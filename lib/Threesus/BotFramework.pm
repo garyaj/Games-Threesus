@@ -1,5 +1,5 @@
 # Creates a new BotFramework that evaluates moves using the specified logic evaluator.
-package Games::Threesus::Core::Bots::BotFramework;
+package Threesus::BotFramework;
 use v5.14;
 use Moo;
 use Types::Standard qw(Str Int ArrayRef);
