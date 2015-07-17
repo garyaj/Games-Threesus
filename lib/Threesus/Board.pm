@@ -2,15 +2,23 @@
 # This version is much faster than the normal Board class, but doesn't contain unique Card IDs.
 package Threesus::Board;
 use v5.14;
-use Moo;
-use Types::Standard qw(Str Int ArrayRef HashRef);
-use strictures 1;
-use namespace::clean;
+use Object::Tiny qw{
+  Width
+  Height
+  _board
+  DEST_SHIFT_RESULTS
+  SOURCE_SHIFT_RESULTS
+  CARD_VALUE_TO_INDEX
+};
+
+use Carp;
 use Threesus::V2D;
+
+use enum qw{None Left Right Up Down};
 
 # Contains fast lookup arrays by card number.
 # Looks up the face value of a card by its 4-bit index.
-use constant CARD_INDEX_TO_VALUE => qw(
+my @CARD_INDEX_TO_VALUE = qw(
   0
   1
   2
@@ -30,7 +38,7 @@ use constant CARD_INDEX_TO_VALUE => qw(
 );
 
 # Looks up the total point value of a card by its 4-bit index.
-use constant CARD_INDEX_TO_POINTS => qw(
+my @CARD_INDEX_TO_POINTS = qw(
   0
   0
   0
@@ -49,27 +57,18 @@ use constant CARD_INDEX_TO_POINTS => qw(
   1594323
 );
 
-has Width  => ( is => 'ro', default => 4);
-has Height => ( is => 'ro', default => 4);
-
-has _board => ( is => 'rw', isa => Str, default => pack("C8", 0)); # 8 bytes = 16 nibbles at 4 bits per nibble = 64 bits.
-
-# A lookup array whose index is (sourceCardIndex | (destCardIndex << 4)) and whose output is the resulting index for the destination cell;
-has DEST_SHIFT_RESULTS => (is => 'rw', isa => ArrayRef[Int], default => sub{[]});
-# A lookup array whose index is (sourceCardIndex | (destCardIndex << 4)) and whose output is the resulting index for the source cell.
-has SOURCE_SHIFT_RESULTS => (is => 'rw', isa => ArrayRef[Int], default => sub{[]});
-
-# Look up the card index by its face value.
-has CARD_VALUE_TO_INDEX => ( is => 'rw', isa => HashRef[Int], default => sub{{}});
-
 # Static constructor to initialize lookup arrays.
 sub Initialize {
   my $self = shift;
+	$self->{_board} = pack("C8", 0); # 8 bytes = 16 nibbles at 4 bits per nibble = 64 bits.
+	$self->{DEST_SHIFT_RESULTS} = [];
+	$self->{SOURCE_SHIFT_RESULTS} = [];
+	$self->{CARD_VALUE_TO_INDEX} = {};
   my $dest = $self->DEST_SHIFT_RESULTS;
   my $src = $self->SOURCE_SHIFT_RESULTS;
   my ($outputSourceIndex, $outputDestIndex);
-  for my $sourceIndex ( 0 .. (scalar CARD_INDEX_TO_VALUE)-1) {
-    for my $destIndex ( 0 .. (scalar CARD_INDEX_TO_VALUE)-1) {
+  for my $sourceIndex ( 0 .. $#CARD_INDEX_TO_VALUE) {
+    for my $destIndex ( 0 .. $#CARD_INDEX_TO_VALUE) {
       if ($destIndex == 0) {
         $outputSourceIndex = 0;
         $outputDestIndex = $sourceIndex;
@@ -94,10 +93,20 @@ sub Initialize {
   }
   my $i = 0;
   my $cvi = $self->CARD_VALUE_TO_INDEX;
-  foreach (CARD_INDEX_TO_VALUE) {
+  foreach (@CARD_INDEX_TO_VALUE) {
     $cvi->{$_} = $i;
     $i++;
   }
+}
+
+# Creates a copy of an existing board without the lookup arrays 
+sub CopyFrom {
+  my ($self, $board) = @_;
+  $self->{DEST_SHIFT_RESULTS} = $board->DEST_SHIFT_RESULTS;
+  $self->{SOURCE_SHIFT_RESULTS} = $board->SOURCE_SHIFT_RESULTS;
+  $self->{Width} = $board->Width;
+  $self->{Height} = $board->Height;
+  $self->{_board} = $board->_board;
 }
 
 # Returns the card index of the card at the specified x, y cooords.
@@ -119,9 +128,7 @@ sub GetCardIndexFromCell {
 # 0 means no card there.
 sub SetCardIndex {
   my ($self, $x, $y, $cardIndex) = @_;
-  my $board = $self->_board;
-  vec($board, $x + 4 * $y, 4) = $cardIndex;
-  $self->_board($board);
+  vec($self->{_board}, $x + 4 * $y, 4) = $cardIndex;
 }
 
 # Sets the card index of the card at the specified cell.
@@ -136,7 +143,7 @@ sub GetTotalScore {
   my ($self) = @_;
   my $total = 0;
   for my $ix (0 .. ($self->Width * $self->Height)-1) {
-    $total += (CARD_INDEX_TO_POINTS)[vec($self->_board,$ix,4)];
+    $total += $CARD_INDEX_TO_POINTS[vec($self->_board,$ix,4)];
   }
   return $total;
 }
@@ -145,11 +152,9 @@ sub GetTotalScore {
 sub GetMaxCardIndex {
   my $self = shift;
   my $max = 0;
-  for my $x ( 0 .. $self->Width) {
-    for my $y ( 0 .. $self->Height) {
-      my $ix = $self->GetCardIndex($x, $y);
-      $max = $ix > $max ? $ix : $max;
-    }
+  for my $ix (0 .. ($self->Width * $self->Height)-1) {
+    my $value = vec($self->_board,$ix,4);
+    $max = $value > $max ? $value : $max;
   }
   return $max;
 }
@@ -162,7 +167,7 @@ sub ToString {
   for my $y ( 0 .. $self->Height-1) {
     for my $x ( 0 .. $self->Width-1) {
       my $cardIndex = $self->GetCardIndex($x, $y);
-      my $value = (CARD_INDEX_TO_VALUE)[$cardIndex];
+      my $value = @CARD_INDEX_TO_VALUE[$cardIndex];
       push @vals, $value;
     }
     $str .= join ", ", @vals;
@@ -178,43 +183,42 @@ sub ToString {
 sub ShiftInPlace {
   my ($self, $dir, $newCardCells) = @_;
   my $oldBoard = $self->_board;
-  if    ($dir == 0)  {$self->ShiftLeft($newCardCells)}
-  elsif ($dir == 1) {$self->ShiftRight($newCardCells)}
-  elsif ($dir == 2)    {$self->ShiftUp($newCardCells)}
-  elsif ($dir == 3)  {$self->ShiftDown($newCardCells)}
-  else { die "Unknown ShiftDirection '$dir'.";}
+  if    ($dir == Left)  {$self->ShiftLeft($newCardCells)}
+  elsif ($dir == Right) {$self->ShiftRight($newCardCells)}
+  elsif ($dir == Up)    {$self->ShiftUp($newCardCells)}
+  elsif ($dir == Down)  {$self->ShiftDown($newCardCells)}
+  else { croak "Unknown ShiftDirection '$dir'.";}
   return $oldBoard ne $self->_board;
 }
 
 # Shifts this board in-place to the left.
 sub ShiftLeft {
   my($self, $newCardCells) = @_;
-  my $newBoard  = $self->_board;
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard, 0, 4);
-    $cellIndex[1] = vec($newBoard, 1, 4);
+    $cellIndex[0] = vec($self->_board, 0, 4);
+    $cellIndex[1] = vec($self->_board, 1, 4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard, 2, 4);
+    $cellIndex[2] = vec($self->_board, 2, 4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard, 3, 4);
+    $cellIndex[3] = vec($self->_board, 3, 4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[0] = Threesus::V2D->new(X => 3, Y => 0);
     } else {
       $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
@@ -222,30 +226,30 @@ sub ShiftLeft {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,0+4,4);
-    $cellIndex[1] = vec($newBoard,1+4,4);
+    $cellIndex[0] = vec($self->_board,0+4,4);
+    $cellIndex[1] = vec($self->_board,1+4,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,2+4,4);
+    $cellIndex[2] = vec($self->_board,2+4,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,3+4,4);
+    $cellIndex[3] = vec($self->_board,3+4,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i+4, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i+4, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[1] = Threesus::V2D->new(X => 3, Y => 1);
     } else {
       $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
@@ -253,30 +257,30 @@ sub ShiftLeft {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,0+8,4);
-    $cellIndex[1] = vec($newBoard,1+8,4);
+    $cellIndex[0] = vec($self->_board,0+8,4);
+    $cellIndex[1] = vec($self->_board,1+8,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,2+8,4);
+    $cellIndex[2] = vec($self->_board,2+8,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,3+8,4);
+    $cellIndex[3] = vec($self->_board,3+8,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i+8, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i+8, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[2] = Threesus::V2D->new(X => 3, Y => 2);
     } else {
       $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
@@ -284,67 +288,65 @@ sub ShiftLeft {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,0+12,4);
-    $cellIndex[1] = vec($newBoard,1+12,4);
+    $cellIndex[0] = vec($self->_board,0+12,4);
+    $cellIndex[1] = vec($self->_board,1+12,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,2+12,4);
+    $cellIndex[2] = vec($self->_board,2+12,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,3+12,4);
+    $cellIndex[3] = vec($self->_board,3+12,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i+12, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i+12, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[3] = Threesus::V2D->new(X => 3, Y => 3);
     } else {
       $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
-  $self->_board($newBoard);
 }
 
 # Shifts this board in-place to the right.
 sub ShiftRight {
   my($self, $newCardCells) = @_;
-  my $newBoard  = $self->_board;
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,3,4);
-    $cellIndex[1] = vec($newBoard,2,4);
+    $cellIndex[0] = vec($self->_board,3,4);
+    $cellIndex[1] = vec($self->_board,2,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,1,4);
+    $cellIndex[2] = vec($self->_board,1,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,0,4);
+    $cellIndex[3] = vec($self->_board,0,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[0] = Threesus::V2D->new(X => 0, Y => 0);
     } else {
       $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
@@ -352,30 +354,30 @@ sub ShiftRight {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,3+4,4);
-    $cellIndex[1] = vec($newBoard,2+4,4);
+    $cellIndex[0] = vec($self->_board,3+4,4);
+    $cellIndex[1] = vec($self->_board,2+4,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,1+4,4);
+    $cellIndex[2] = vec($self->_board,1+4,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,0+4,4);
+    $cellIndex[3] = vec($self->_board,0+4,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i+4, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i+4, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[1] = Threesus::V2D->new(X => 0, Y => 1);
     } else {
       $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
@@ -383,30 +385,30 @@ sub ShiftRight {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,3+8,4);
-    $cellIndex[1] = vec($newBoard,2+8,4);
+    $cellIndex[0] = vec($self->_board,3+8,4);
+    $cellIndex[1] = vec($self->_board,2+8,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,1+8,4);
+    $cellIndex[2] = vec($self->_board,1+8,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,0+8,4);
+    $cellIndex[3] = vec($self->_board,0+8,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i+8, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i+8, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[2] = Threesus::V2D->new(X => 0, Y => 2);
     } else {
       $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
@@ -414,67 +416,65 @@ sub ShiftRight {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,3+12,4);
-    $cellIndex[1] = vec($newBoard,2+12,4);
+    $cellIndex[0] = vec($self->_board,3+12,4);
+    $cellIndex[1] = vec($self->_board,2+12,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,1+12,4);
+    $cellIndex[2] = vec($self->_board,1+12,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,0+12,4);
+    $cellIndex[3] = vec($self->_board,0+12,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i+12, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i+12, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[3] = Threesus::V2D->new(X => 0, Y => 3);
     } else {
       $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
-  $self->_board($newBoard);
 }
 
 # Shifts this board in-place up.
 sub ShiftUp {
   my($self, $newCardCells) = @_;
-  my $newBoard  = $self->_board;
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard, 0, 4);
-    $cellIndex[1] = vec($newBoard, 4, 4);
+    $cellIndex[0] = vec($self->_board, 0, 4);
+    $cellIndex[1] = vec($self->_board, 4, 4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard, 8, 4);
+    $cellIndex[2] = vec($self->_board, 8, 4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard, 12, 4);
+    $cellIndex[3] = vec($self->_board, 12, 4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i*4, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[0] = Threesus::V2D->new(X => 0, Y => 3);
     } else {
       $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
@@ -482,30 +482,30 @@ sub ShiftUp {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard, 1+0, 4);
-    $cellIndex[1] = vec($newBoard, 1+4, 4);
+    $cellIndex[0] = vec($self->_board, 1+0, 4);
+    $cellIndex[1] = vec($self->_board, 1+4, 4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard, 1+8, 4);
+    $cellIndex[2] = vec($self->_board, 1+8, 4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard, 1+12, 4);
+    $cellIndex[3] = vec($self->_board, 1+12, 4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4+1, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i*4+1, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[1] = Threesus::V2D->new(X => 1, Y => 3);
     } else {
       $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
@@ -513,30 +513,30 @@ sub ShiftUp {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard, 2+0, 4);
-    $cellIndex[1] = vec($newBoard, 2+4, 4);
+    $cellIndex[0] = vec($self->_board, 2+0, 4);
+    $cellIndex[1] = vec($self->_board, 2+4, 4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard, 2+8, 4);
+    $cellIndex[2] = vec($self->_board, 2+8, 4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard, 2+12, 4);
+    $cellIndex[3] = vec($self->_board, 2+12, 4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4+2, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i*4+2, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[2] = Threesus::V2D->new(X => 2, Y => 3);
     } else {
       $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
@@ -544,67 +544,65 @@ sub ShiftUp {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard, 3+0, 4);
-    $cellIndex[1] = vec($newBoard, 3+4, 4);
+    $cellIndex[0] = vec($self->_board, 3+0, 4);
+    $cellIndex[1] = vec($self->_board, 3+4, 4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard, 3+8, 4);
+    $cellIndex[2] = vec($self->_board, 3+8, 4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard, 3+12, 4);
+    $cellIndex[3] = vec($self->_board, 3+12, 4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4+3, 4) = $cellIndex[$i];
+      vec($self->{_board}, $i*4+3, 4) = $cellIndex[$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[3] = Threesus::V2D->new(X => 3, Y => 3);
     } else {
       $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
-  $self->_board($newBoard);
 }
 
 # Shifts this board in-place down.
 sub ShiftDown {
   my($self, $newCardCells) = @_;
-  my $newBoard  = $self->_board;
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,12,4);
-    $cellIndex[1] = vec($newBoard,8,4);
+    $cellIndex[0] = vec($self->_board,12,4);
+    $cellIndex[1] = vec($self->_board,8,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,4,4);
+    $cellIndex[2] = vec($self->_board,4,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,0,4);
+    $cellIndex[3] = vec($self->_board,0,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i*4, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[0] = Threesus::V2D->new(X => 0, Y => 0);
     } else {
       $newCardCells->[0] = Threesus::V2D->new(X => -1, Y => -1);
@@ -612,30 +610,30 @@ sub ShiftDown {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,1+12,4);
-    $cellIndex[1] = vec($newBoard,1+8,4);
+    $cellIndex[0] = vec($self->_board,1+12,4);
+    $cellIndex[1] = vec($self->_board,1+8,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,1+4,4);
+    $cellIndex[2] = vec($self->_board,1+4,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,1+0,4);
+    $cellIndex[3] = vec($self->_board,1+0,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4+1, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i*4+1, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[1] = Threesus::V2D->new(X => 1, Y => 0);
     } else {
       $newCardCells->[1] = Threesus::V2D->new(X => -1, Y => -1);
@@ -643,30 +641,30 @@ sub ShiftDown {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,2+12,4);
-    $cellIndex[1] = vec($newBoard,2+8,4);
+    $cellIndex[0] = vec($self->_board,2+12,4);
+    $cellIndex[1] = vec($self->_board,2+8,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,2+4,4);
+    $cellIndex[2] = vec($self->_board,2+4,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,2+0,4);
+    $cellIndex[3] = vec($self->_board,2+0,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4+2, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i*4+2, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[2] = Threesus::V2D->new(X => 2, Y => 0);
     } else {
       $newCardCells->[2] = Threesus::V2D->new(X => -1, Y => -1);
@@ -674,36 +672,35 @@ sub ShiftDown {
   }
 
   {
-    my $prevBoard = $newBoard;
+    my $prevBoard = $self->_board;
 
     my @cellIndex = ();
-    $cellIndex[0] = vec($newBoard,3+12,4);
-    $cellIndex[1] = vec($newBoard,3+8,4);
+    $cellIndex[0] = vec($self->_board,3+12,4);
+    $cellIndex[1] = vec($self->_board,3+8,4);
 
     my $arrayLookup = $cellIndex[1] | ($cellIndex[0] << 4);
     $cellIndex[0] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[1] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[2] = vec($newBoard,3+4,4);
+    $cellIndex[2] = vec($self->_board,3+4,4);
     $arrayLookup = $cellIndex[2] | ($cellIndex[1] << 4);
     $cellIndex[1] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[2] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
-    $cellIndex[3] = vec($newBoard,3+0,4);
+    $cellIndex[3] = vec($self->_board,3+0,4);
     $arrayLookup = $cellIndex[3] | ($cellIndex[2] << 4);
     $cellIndex[2] = $self->DEST_SHIFT_RESULTS->[$arrayLookup];
     $cellIndex[3] = $self->SOURCE_SHIFT_RESULTS->[$arrayLookup];
 
     for my $i (0 .. 3) {
-      vec($newBoard, $i*4+3, 4) = $cellIndex[3-$i];
+      vec($self->{_board}, $i*4+3, 4) = $cellIndex[3-$i];
     }
-    if ($prevBoard ne $newBoard) {
+    if ($prevBoard ne $self->_board) {
       $newCardCells->[3] = Threesus::V2D->new(X => 3, Y => 0);
     } else {
       $newCardCells->[3] = Threesus::V2D->new(X => -1, Y => -1);
     }
   }
-  $self->_board($newBoard);
 }
 
 # Returns whether the specified cards can merge together.

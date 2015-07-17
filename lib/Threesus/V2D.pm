@@ -1,13 +1,7 @@
 # Stores a 2-dimensional point or displacement in space as two integer values.
 package Threesus::V2D;
 use v5.14;
-use Moo;
-use Types::Standard qw(Str Int ArrayRef HashRef);
-use strictures 1;
-use namespace::clean;
-
-has X => (isa => Int, is => 'rw');
-has Y => (isa => Int, is => 'rw');
+use Object::Tiny qw{ X Y };
 
 ## Returns whether this IntVector2D is equal to the specified object.
 #public override bool Equals(object obj)

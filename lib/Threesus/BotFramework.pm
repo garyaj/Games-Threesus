@@ -1,16 +1,15 @@
 # Creates a new BotFramework that evaluates moves using the specified logic evaluator.
 package Threesus::BotFramework;
 use v5.14;
-use Moo;
-use Types::Standard qw(Str Int ArrayRef);
-use namespace::clean;
-use enum qw(One Two Three Bonus);
+use Carp;
+use Object::Tiny qw{
+  moveSearchDepth 
+  cardCountDepth 
+};
+use Threesus::Game;
 
-# The number of moves into the future to examine. Should be at least 1.
-has moveSearchDepth => ( is => 'ro', default => 6);
-# The number of moves into the future in which the deck should be "card counted"
-has cardCountDepth => ( is => 'ro', default => 3);
-
+use enum qw{None Left Right Up Down};
+use enum qw{Zero One Two Three Bonus};
 
 # Returns the next move to make based on the state of the specified game, or null to make no move.
 sub GetNextMove {
@@ -21,7 +20,7 @@ sub GetNextMove {
   elsif ($nextCardHint == Two)   { $knownNextCardIndex = 2 }
   elsif ($nextCardHint == Three) { $knownNextCardIndex = 3 }
   elsif ($nextCardHint == Bonus) { $knownNextCardIndex = "Bonus" }
-  else {die "Unknown NextCardHint '$nextCardHint'."}
+  else {croak "Unknown NextCardHint '$nextCardHint'."}
   my $quality;
   return $self->GetBestMoveForBoard($board, $deck, $knownNextCardIndex, $self->moveSearchDepth - 1, \$quality, \$movesEvaluated);
 }
@@ -40,25 +39,25 @@ sub ToString {
 sub GetBestMoveForBoard {
   my ($self, $board, $deck, $knownNextCardIndex, $recursionsLeft, $pmoveQuality, $pmovesEvaluated) = @_;
   my ($moves1, $moves2) = (0, 0);
-  my $leftQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 0, $recursionsLeft, \$moves1);
-  my $rightQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 1, $recursionsLeft, \$moves1);
-  my $upQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 2, $recursionsLeft, \$moves2);
-  my $downQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, 3, $recursionsLeft, \$moves2);
+  my $leftQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Left, $recursionsLeft, \$moves1);
+  my $rightQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Right, $recursionsLeft, \$moves1);
+  my $upQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Up, $recursionsLeft, \$moves2);
+  my $downQuality = $self->EvaluateMoveForBoard($board, $deck, $knownNextCardIndex, Down, $recursionsLeft, \$moves2);
   $$pmovesEvaluated += $moves1 + $moves2;
 
   my $bestQuality = $leftQuality;
-  my $bestDir = $bestQuality ? "Left" : '';
+  my $bestDir = $bestQuality ? Left : 0;
   if($rightQuality > $bestQuality) {
     $bestQuality = $rightQuality;
-    $bestDir = "Right";
+    $bestDir = Right;
   }
   if($upQuality > $bestQuality) {
     $bestQuality = $upQuality;
-    $bestDir = "Up";
+    $bestDir = Up;
   }
   if($downQuality > $bestQuality) {
     $bestQuality = $downQuality;
-    $bestDir = "Down";
+    $bestDir = Down;
   }
   $$pmoveQuality = $bestQuality;
   return $bestDir;
@@ -68,7 +67,13 @@ sub GetBestMoveForBoard {
 # Returns null if shifting in that direction is not possible.
 sub EvaluateMoveForBoard {
   my ($self, $board, $deck, $knownNextCardIndex, $dir, $recursionsLeft, $pmovesEvaluated) = @_;
-  my $shiftedBoard = $board;
+  my $shiftedBoard = Threesus::Board->new(
+    DEST_SHIFT_RESULTS => $board->DEST_SHIFT_RESULTS,
+    SOURCE_SHIFT_RESULTS => $board->SOURCE_SHIFT_RESULTS,
+    Width => $board->Width,
+    Height => $board->Height,
+    _board => $board->_board,
+  );
   my $totalQuality;
   my $totalWeight;
   my $newCardCells = [];
@@ -77,13 +82,19 @@ sub EvaluateMoveForBoard {
     $totalWeight = 0;
 
     if( $knownNextCardIndex eq 'Bonus') {
-      my $indexes = Game->new->GetPossibleBonusCardIndexes($board->GetMaxCardIndex);
-      for my $i ( 0 .. $#{$indexes}) {
-        my $cardIndex = $indexes->[$i];
+      my $game = Threesus::Game->new->Initialize;
+      my $indexes = $game->GetPossibleBonusCardIndexes($board->GetMaxCardIndex);
+      for my $cardIndex (@{$indexes}) {
         for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
-          my $newBoard = $shiftedBoard;
+          my $newBoard = Threesus::Board->new(
+            DEST_SHIFT_RESULTS => $shiftedBoard->DEST_SHIFT_RESULTS,
+            SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
+            Width => $shiftedBoard->Width,
+            Height => $shiftedBoard->Height,
+            _board => $shiftedBoard->_board,
+          );
           $newBoard->SetCardIndexFromCell($cell, $cardIndex);
 
           my $quality;
@@ -98,12 +109,22 @@ sub EvaluateMoveForBoard {
         }
       }
     } elsif ($knownNextCardIndex > 0) {
-      my $newDeck = $deck;
+      my $newDeck = Threesus::FastDeck->new(
+        Ones => $deck->Ones,
+        Twos => $deck->Twos,
+        Threes => $deck->Threes,
+      );
       $newDeck->Remove($knownNextCardIndex);
       for my $cell (@{$newCardCells}) {
         next if ($cell->X < 0);
 
-        my $newBoard = $shiftedBoard;
+        my $newBoard = Threesus::Board->new(
+          DEST_SHIFT_RESULTS => $shiftedBoard->DEST_SHIFT_RESULTS,
+          SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
+          Width => $shiftedBoard->Width,
+          Height => $shiftedBoard->Height,
+          _board => $shiftedBoard->_board,
+        );
         $newBoard->SetCardIndexFromCell($cell, $knownNextCardIndex);
 
         my $quality;
@@ -118,13 +139,23 @@ sub EvaluateMoveForBoard {
       }
     } elsif ($self->moveSearchDepth - $recursionsLeft - 1 < $self->cardCountDepth) {
       if ($deck->Ones > 0) {
-        my $newDeck = $deck;
+        my $newDeck = Threesus::FastDeck->new(
+          Ones => $deck->Ones,
+          Twos => $deck->Twos,
+          Threes => $deck->Threes,
+        );
         $newDeck->RemoveOne;
         for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
-          my $newBoard = $shiftedBoard;
-          $newBoard->SetCardIndexFromCell($cell, 1);
+          my $newBoard = Threesus::Board->new(
+            DEST_SHIFT_RESULTS => $shiftedBoard->DEST_SHIFT_RESULTS,
+            SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
+            Width => $shiftedBoard->Width,
+            Height => $shiftedBoard->Height,
+            _board => $shiftedBoard->_board,
+          );
+          $newBoard->SetCardIndexFromCell($cell, One);
 
           my $quality;
           if ($recursionsLeft == 0
@@ -139,13 +170,23 @@ sub EvaluateMoveForBoard {
       }
 
       if ($deck->Twos > 0) {
-        my $newDeck = $deck;
+        my $newDeck = Threesus::FastDeck->new(
+          Ones => $deck->Ones,
+          Twos => $deck->Twos,
+          Threes => $deck->Threes,
+        );
         $newDeck->RemoveTwo;
         for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
-          my $newBoard = $shiftedBoard;
-          $newBoard->SetCardIndexFromCell($cell, 2);
+          my $newBoard = Threesus::Board->new(
+            DEST_SHIFT_RESULTS => $shiftedBoard->DEST_SHIFT_RESULTS,
+            SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
+            Width => $shiftedBoard->Width,
+            Height => $shiftedBoard->Height,
+            _board => $shiftedBoard->_board,
+          );
+          $newBoard->SetCardIndexFromCell($cell, Two);
 
           my $quality;
           if ($recursionsLeft == 0
@@ -159,13 +200,23 @@ sub EvaluateMoveForBoard {
         }
       }
       if ($deck->Threes > 0) {
-        my $newDeck = $deck;
+        my $newDeck = Threesus::FastDeck->new(
+          Ones => $deck->Ones,
+          Twos => $deck->Twos,
+          Threes => $deck->Threes,
+        );
         $newDeck->RemoveThree;
         for my $cell (@{$newCardCells}) {
           next if ($cell->X < 0);
 
-          my $newBoard = $shiftedBoard;
-          $newBoard->SetCardIndexFromCell($cell, 3);
+          my $newBoard = Threesus::Board->new(
+            DEST_SHIFT_RESULTS => $shiftedBoard->DEST_SHIFT_RESULTS,
+            SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
+            Width => $shiftedBoard->Width,
+            Height => $shiftedBoard->Height,
+            _board => $shiftedBoard->_board,
+          );
+          $newBoard->SetCardIndexFromCell($cell, Three);
 
           my $quality;
           if ($recursionsLeft == 0

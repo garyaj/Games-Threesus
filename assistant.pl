@@ -3,22 +3,34 @@
 use v5.14;
 use lib './lib';
 use Threesus::Board;
-use Threesus::Card;
 use Threesus::Deck;
-use Threesus::Game;
 use Threesus::FastDeck;
 use Threesus::BotFramework;
 use Data::Dumper;
+use List::MoreUtils qw{firstidx};
+use Carp;
 
-my $_bot = Threesus::BotFramework->new;
+use IO::Prompter <<EOD;
+..3.
+3123
+.12.
+..13
+2
+EOD
+
+use enum qw{Zero One Two Three Bonus};
+use enum qw{None Left Right Up Down};
+my $Dir = [qw{None Left Right Up Down}];
+
+my $_bot = Threesus::BotFramework->new(
+  moveSearchDepth => 6, cardCountDepth => 3,
+);
 
 # Main application entry point.
 # Build the board and initialize the deck.
 my $deck = Threesus::Deck->new;
 $deck->RebuildDeck;
-my $fd = Threesus::FastDeck->new;
-$fd->Initialize;
-my $board = Threesus::Board->new;
+my $board = Threesus::Board->new( Width => 4, Height => 4,);
 $board->Initialize;    #Initialise fast lookup arrays
 say("Let's initialize the board...");
 say(
@@ -26,21 +38,17 @@ say(
 );
 
 for my $y ( 0 .. $board->Height - 1 ) {
-  printf( "Enter row %d: ", $y );
-  my $rowStr = <>;
-  chomp $rowStr;
+  my $rowStr = prompt "Enter row $y";
   if ( length($rowStr) != $board->Width ) {
     say("Invalid length of entered row.");
     $y--;
-    continue;
+    redo;
   }
 
   for my $x ( 0 .. $board->Width - 1 ) {
     my $cardval = GetCardValFromChar( substr( $rowStr, $x, 1 ), 0 );
     if ( $cardval > 0 ) {
-      my $bd = $board->_board;
-      vec( $bd, $x + 4 * $y, 4 ) = $cardval;
-      $board->_board($bd);
+      vec( $board->{_board}, $x + 4 * $y, 4 ) = $cardval;
       $deck->RemoveCard($cardval);
     }
   }
@@ -52,7 +60,7 @@ my $decksStack  = [];
 
 # Now let's play!
 while (1) {
-redo:
+REDO:
 
   # Print the current board status.
   say("--------------------");
@@ -72,16 +80,14 @@ redo:
   printf( "Current total score: %d\n", $board->GetTotalScore );
 
   # Get the next card.
-  print("What is the next card? ");
   my $nextCardStr;
   my $nextCard;
   do {
-    $nextCardStr = <>;
-    chomp $nextCardStr;
+    $nextCardStr = prompt "What is the next card? ";
     if ( $nextCardStr eq "undo" ) {
       my $board = pop @$boardsStack;
       my $deck  = pop @$decksStack;
-      goto redo;
+      goto REDO;
     }
     } while ( length($nextCardStr) != 1
     || !( $nextCard = GetCardValFromChar( $nextCardStr, 1 ) ) );
@@ -89,12 +95,13 @@ redo:
 
   # Choose a move.
   print("Thinking...");
+  my $fd = Threesus::FastDeck->new;
+  $fd->InitFromDeck($deck);
   my $aiDir = $_bot->GetNextMove( $board, $fd, $nextCardHint );
   if ($aiDir) {
-    printf( "\nSWIPE %s.\n", $aiDir );
+    printf( "\nSWIPE %s.\n", $Dir->[$aiDir] );
   } else {
     say("NO MORE MOVES.");
-    break;
   }
 
   # Confirm the swipe.
@@ -112,11 +119,11 @@ redo:
 
   # Get the new card location.
   my $newCardIndex;
-  if ( @$newCardCells > 1 ) {
+  if ( scalar @$newCardCells > 1 ) {
     say("Here are the locations where a new card might have been inserted:");
     for my $y ( 0 .. $board->Height - 1 ) {
       for my $x ( 0 .. $board->Width - 1 ) {
-        my $index = $newCardCells->[$x][$y];
+        my $index = firstidx { $_->X == $x and $_->Y == $y } @{$newCardCells};
         if ( $index >= 0 ) {
           print( chr( ord('a') + $index ) );
         } else {
@@ -125,10 +132,8 @@ redo:
       }
       say;
     }
-    print("Where was it actually inserted? ");
     do {
-      my $indexStr = <>;
-      chomp $indexStr;
+      my $indexStr = prompt "Where was it actually inserted? ";
       if ( length($indexStr) == 1 ) {
         $newCardIndex = ord($indexStr) - ord('a');
       } else {
@@ -141,19 +146,19 @@ redo:
 
   # Get new card value.
   my $newCardValue;
-  if ( $nextCardHint == 3 ) {
+  if ( $nextCardHint == Bonus ) {
     do {
-      print("!!! What is the value of the new card? ");
     } unless ( $newCardValue = GetNewCardValue() );
   } else {
-    $newCardValue = $nextCardHint + 1;
+    $newCardValue = $nextCardHint;
   }
   $deck->RemoveCard($newCardValue);
   my $cell = $newCardCells->[$newCardIndex];
-  vec( $board->_board, $cell->X + 4 * $cell->Y, 4 ) = $newCardValue;
+  vec( $board->{_board}, $cell->X + 4 * $cell->Y, 4 ) = $newCardValue;
 
   push @$boardsStack, $board;
   push @$decksStack,  $deck;
+  exit;
 }
 
 say( "FINAL SCORE IS %d.", $board->GetTotalScore );
@@ -181,11 +186,11 @@ sub GetCardValFromChar {
 
 # Returns the NextCardHint given the specified next card.
 sub GetNextCardHint {
-  if ( $_[0] == 1 ) { return 0; }    #One
-  if ( $_[0] == 2 ) { return 1; }    #Two
-  if ( $_[0] == 3 ) { return 2; }    #Three
-                                     # else
-  return 3;                          #Bonus
+  if ( $_[0] == 1 ) { return One; }
+  if ( $_[0] == 2 ) { return Two; }
+  if ( $_[0] == 3 ) { return Three; }
+  # else
+  return Bonus;
 }
 
 # Returns the shift direction as specified by the specified string, or null if none was specified.
@@ -208,8 +213,7 @@ sub GetNextCardHint {
 
 # Attempts to extract the value of a new card from the specified string.
 sub GetNewCardValue {
-  my $str = <>;
-  chomp $str;
+  my $str = prompt "!!! What is the value of the new card? ";
   $str += 0;
 
   # Verify that it's a real card.

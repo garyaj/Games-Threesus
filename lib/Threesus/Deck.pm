@@ -1,43 +1,57 @@
 # Manages a randomly-shuffled deck of card values.
 package Threesus::Deck;
 use v5.14;
-use Moo;
-use Types::Standard qw(Str Int ArrayRef HashRef);
-use strictures 1;
-use namespace::clean;
+use Object::Tiny qw{
+  _cardValues
+};
 
-use constant INITIAL_CARD_VALUES => qw(1 1 1 1 2 2 2 2 3 3 3 3);
+use List::Util qw{shuffle};
 
-has _cardValues => (isa => ArrayRef[Int], is => 'rw', default => sub {[]});
+my @INITIAL_CARD_VALUES = qw(1 1 1 1 2 2 2 2 3 3 3 3);
 
 # Removes and returns the next card value from the top of this Deck.
 sub DrawNextCard {
   my $self = shift;
-  if ($self->_cardValues == 0) {
+  if (scalar @{$self->_cardValues} == 0) {
     $self->RebuildDeck();
   }
-  return pop @$self->_cardValues;
+  return pop @{$self->{_cardValues}};
+}
+
+sub GetCountsOfCards {
+  my $self = shift;
+  if (scalar @{$self->_cardValues} == 0) {
+    $self->RebuildDeck();
+  }
+  my $ret = {};
+  for my $value (@{$self->_cardValues}) {
+    if (exists $ret->{$value}) {
+      $ret->{$value}++;
+    } else {
+      $ret->{$value} = 1;
+    }
+  }
+  return $ret;
 }
 
 # Returns a hint about what the value of the next drawn card will be.
 sub PeekNextCard {
   my $self = shift;
-  if ($self->_cardValues == 0) {
+  if (scalar @{$self->_cardValues} == 0) {
     $self->RebuildDeck();
   }
-  return $self->_cardValues->[-1];
+  return $self->{_cardValues}->[-1];
 }
 
 # Removes a card of the specified value from this deck.
 sub RemoveCard {
   my ($self, $cardValue) = @_;
-  if ($self->_cardValues == 0) {
+  if (scalar @{$self->_cardValues} == 0) {
     $self->RebuildDeck();
   }
-  my $cv = $self->_cardValues;
-  for my $i (0 .. $self->_cardValues - 1) {
-    if ($cv->[$i] == $cardValue) {
-      splice(@{$cv}, $i, 1);  #remove 1 item
+  for my $i (0 .. $#{$self->_cardValues}) {
+    if ($self->_cardValues->[$i] == $cardValue) {
+      splice(@{$self->{_cardValues}}, $i, 1);  #remove 1 item
       last;
     }
   }
@@ -48,20 +62,8 @@ sub RemoveCard {
 sub RebuildDeck {
   my $self = shift;
 
-  push @{$self->_cardValues}, INITIAL_CARD_VALUES;
-  fisher_yates_shuffle($self->_cardValues);
-}
-
-# fisher_yates_shuffle( \@array ) : generate a random permutation
-# of @array in place
-sub fisher_yates_shuffle {
-  my $array = shift;
-  my $i;
-  for ($i = @$array; --$i; ) {
-    my $j = int rand ($i+1);
-    next if $i == $j;
-    @$array[$i,$j] = @$array[$j,$i];
-  }
+  push @{$self->{_cardValues}}, @INITIAL_CARD_VALUES;
+  @{$self->{_cardValues}} = shuffle @{$self->{_cardValues}};
 }
 
 1;

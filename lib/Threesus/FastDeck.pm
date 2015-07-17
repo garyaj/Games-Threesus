@@ -1,21 +1,28 @@
 # Stores count totals of the current deck for the purpose of counting cards. 
 package Threesus::FastDeck;
 use v5.14;
-use Moo;
-use Types::Standard qw(Str Int ArrayRef HashRef);
-use strictures 1;
-use namespace::clean;
+use Object::Tiny qw{
+  Ones
+  Twos
+  Threes
+};
 
-has Ones   => ( is => 'rw' );
-has Twos   => ( is => 'rw' );
-has Threes => ( is => 'rw' );
+use enum qw{Zero One Two Three Bonus};
 
 # Initializes the card counts to their full-deck values.
 sub Initialize {
   my $self = shift;
-  $self->Ones(4);
-  $self->Twos(4);
-  $self->Threes(4);
+  $self->{Ones} = 4;
+  $self->{Twos} = 4;
+  $self->{Threes} = 4;
+}
+
+sub InitFromDeck {
+  my ($self, $deck) = @_;
+  my $cardCounts = $deck->GetCountsOfCards;
+  $self->{Ones} = $cardCounts->{1} // 0;
+  $self->{Twos} = $cardCounts->{2} // 0;
+  $self->{Threes} = $cardCounts->{3} // 0;
 }
 
 # Removes a single 1 card from the deck.
@@ -48,9 +55,9 @@ sub RemoveThree {
 # Removes a single card of the specified value from the deck.
 sub Remove {
   my ($self, $cardIndex) = @_;
-    if    ($cardIndex == 1) { $self->Ones($self->Ones-1) }
-    elsif ($cardIndex == 2) { $self->Twos($self->Twos-1) }
-    elsif ($cardIndex == 3) { $self->Threes($self->Threes-1) }
+    if    ($cardIndex == 1) { $self->{Ones} = $self->Ones - 1 }
+    elsif ($cardIndex == 2) { $self->{Twos} = $self->Twos - 1 }
+    elsif ($cardIndex == 3) { $self->{Threes} = $self->Threes - 1 }
 
   if ($self->Ones + $self->Twos + $self->Threes == 0) {
     $self->Initialize;
