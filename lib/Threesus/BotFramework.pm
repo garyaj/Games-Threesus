@@ -1,15 +1,19 @@
 # Creates a new BotFramework that evaluates moves using the specified logic evaluator.
 package Threesus::BotFramework;
-use v5.14;
+use strict;
+use warnings;
 use Carp;
-use Object::Tiny qw{
-  moveSearchDepth 
-  cardCountDepth 
-};
 use Threesus::Game;
 
 use enum qw{None Left Right Up Down};
 use enum qw{Zero One Two Three Bonus};
+
+sub new {
+  my $class = shift;
+  bless { @_ }, $class;
+}
+sub moveSearchDepth { return $_[0]->{moveSearchDepth} }
+sub cardCountDepth{ return $_[0]->{cardCountDepth} }
 
 # Returns the next move to make based on the state of the specified game, or null to make no move.
 sub GetNextMove {
@@ -72,7 +76,7 @@ sub EvaluateMoveForBoard {
     SOURCE_SHIFT_RESULTS => $board->SOURCE_SHIFT_RESULTS,
     Width => $board->Width,
     Height => $board->Height,
-    _board => $board->_board,
+    board => $board->board,
   );
   my $totalQuality;
   my $totalWeight;
@@ -93,7 +97,7 @@ sub EvaluateMoveForBoard {
             SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
             Width => $shiftedBoard->Width,
             Height => $shiftedBoard->Height,
-            _board => $shiftedBoard->_board,
+            board => $shiftedBoard->board,
           );
           $newBoard->SetCardIndexFromCell($cell, $cardIndex);
 
@@ -123,7 +127,7 @@ sub EvaluateMoveForBoard {
           SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
           Width => $shiftedBoard->Width,
           Height => $shiftedBoard->Height,
-          _board => $shiftedBoard->_board,
+          board => $shiftedBoard->board,
         );
         $newBoard->SetCardIndexFromCell($cell, $knownNextCardIndex);
 
@@ -153,7 +157,7 @@ sub EvaluateMoveForBoard {
             SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
             Width => $shiftedBoard->Width,
             Height => $shiftedBoard->Height,
-            _board => $shiftedBoard->_board,
+            board => $shiftedBoard->board,
           );
           $newBoard->SetCardIndexFromCell($cell, One);
 
@@ -184,7 +188,7 @@ sub EvaluateMoveForBoard {
             SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
             Width => $shiftedBoard->Width,
             Height => $shiftedBoard->Height,
-            _board => $shiftedBoard->_board,
+            board => $shiftedBoard->board,
           );
           $newBoard->SetCardIndexFromCell($cell, Two);
 
@@ -214,7 +218,7 @@ sub EvaluateMoveForBoard {
             SOURCE_SHIFT_RESULTS => $shiftedBoard->SOURCE_SHIFT_RESULTS,
             Width => $shiftedBoard->Width,
             Height => $shiftedBoard->Height,
-            _board => $shiftedBoard->_board,
+            board => $shiftedBoard->board,
           );
           $newBoard->SetCardIndexFromCell($cell, Three);
 

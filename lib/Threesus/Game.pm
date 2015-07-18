@@ -1,18 +1,28 @@
 # Manages the current state and rules of the game.
 package Threesus::Game;
-use v5.14;
-use Object::Tiny qw{
-	deck
-	board
-	prevBoard
-	tempBoard
-	nextBonusCard
-};
+use strict;
+use warnings;
 use Threesus::Board;
 
 my $NUM_INITIAL_CARDS = 9;
 my $BONUS_CARD_CHANCE = 1.0 / 21.0;
 use enum qw{Zero One Two Three Bonus};
+
+sub new {
+  my $class = shift;
+  bless {
+    deck => '',
+    board => '',
+    prevBoard => '',
+    tempBoard => '',
+    nextBonusCard => '',
+  }, $class;
+}
+sub deck { return $_[0]->{deck} }
+sub board { return $_[0]->{board} }
+sub prevBoard { return $_[0]->{prevBoard} }
+sub tempBoard { return $_[0]->{tempBoard} }
+sub nextBonusCard { return $_[0]->{nextBonusCard} }
 
 # Gets the current state of the game board.
 sub CurrentBoard {
@@ -63,7 +73,7 @@ sub Shift {
   my $shifted = $self->board->ShiftInPlace($dir, $newCardCells);
   if ($shifted) {
     my $newCardCell = $newCardCells->[rand(scalar @$newCardCells)];
-    vec($self->board->{_board}, $newCardCell->X + $newCardCell->Y * 4, 4) = $self->DrawNextCard;
+    vec($self->board->{board}, $newCardCell->X + $newCardCell->Y * 4, 4) = $self->DrawNextCard;
 
     $self->prevBoard = $self->tempBoard;
   }
@@ -75,7 +85,7 @@ sub InitializeBoard {
   my ($self) = @_;
   for (1 .. $NUM_INITIAL_CARDS) {
     my $cell = $self->GetRandomEmptyCell;
-    vec($self->board->{_board}, $cell->X + 4 * $cell->Y, 4) = $self->DrawNextCard;
+    vec($self->board->{board}, $cell->X + 4 * $cell->Y, 4) = $self->DrawNextCard;
   }
 }
 
@@ -89,7 +99,7 @@ sub GetRandomEmptyCell {
       Y => rand( $self->board->Height)
     );
   } while(
-    vec($self->board->{_board}, $ret->X + 4 * $ret->Y, 4) != 0
+    vec($self->board->{board}, $ret->X + 4 * $ret->Y, 4) != 0
   );
   return $ret;
 }

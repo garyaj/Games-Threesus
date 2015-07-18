@@ -1,13 +1,21 @@
 # Stores count totals of the current deck for the purpose of counting cards. 
 package Threesus::FastDeck;
-use v5.14;
-use Object::Tiny qw{
-  Ones
-  Twos
-  Threes
-};
+use strict;
+use warnings;
 
 use enum qw{Zero One Two Three Bonus};
+
+sub new {
+  my $class = shift;
+  bless { 
+    Ones => 4,
+    Twos => 4,
+    Threes => 4,
+  }, $class;
+}
+sub Ones { return $_[0]->{Ones} }
+sub Twos { return $_[0]->{Twos} }
+sub Threes { return $_[0]->{Threes} }
 
 # Initializes the card counts to their full-deck values.
 sub Initialize {

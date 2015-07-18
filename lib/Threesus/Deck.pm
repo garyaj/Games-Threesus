@@ -1,13 +1,21 @@
 # Manages a randomly-shuffled deck of card values.
 package Threesus::Deck;
-use v5.14;
-use Object::Tiny qw{
-  _cardValues
-};
+use strict;
+use warnings;
 
 use List::Util qw{shuffle};
 
 my @INITIAL_CARD_VALUES = qw(1 1 1 1 2 2 2 2 3 3 3 3);
+
+sub new {
+  my $class = shift;
+  my $self = {@_};
+  bless $self, $class;
+  $self->RebuildDeck();
+  return $self;
+}
+
+sub _cardValues { return $_[0]->{_cardValues} }
 
 # Removes and returns the next card value from the top of this Deck.
 sub DrawNextCard {

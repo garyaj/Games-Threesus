@@ -29,9 +29,8 @@ my $_bot = Threesus::BotFramework->new(
 # Main application entry point.
 # Build the board and initialize the deck.
 my $deck = Threesus::Deck->new;
-$deck->RebuildDeck;
+# $deck->RebuildDeck;
 my $board = Threesus::Board->new( Width => 4, Height => 4,);
-$board->Initialize;    #Initialise fast lookup arrays
 say("Let's initialize the board...");
 say(
 "The format for each line should be four characters, each a 1, 2, 3, or any other character to represent an empty space."
@@ -41,14 +40,13 @@ for my $y ( 0 .. $board->Height - 1 ) {
   my $rowStr = prompt "Enter row $y";
   if ( length($rowStr) != $board->Width ) {
     say("Invalid length of entered row.");
-    $y--;
     redo;
   }
 
   for my $x ( 0 .. $board->Width - 1 ) {
     my $cardval = GetCardValFromChar( substr( $rowStr, $x, 1 ), 0 );
     if ( $cardval > 0 ) {
-      vec( $board->{_board}, $x + 4 * $y, 4 ) = $cardval;
+      vec( $board->{board}, $x + 4 * $y, 4 ) = $cardval;
       $deck->RemoveCard($cardval);
     }
   }
@@ -97,7 +95,9 @@ REDO:
   print("Thinking...");
   my $fd = Threesus::FastDeck->new;
   $fd->InitFromDeck($deck);
+      $DB::single = 2;
   my $aiDir = $_bot->GetNextMove( $board, $fd, $nextCardHint );
+      $DB::single = 2;
   if ($aiDir) {
     printf( "\nSWIPE %s.\n", $Dir->[$aiDir] );
   } else {
@@ -115,7 +115,6 @@ REDO:
 # }
 # while(actualDir == null);*/
   my $newCardCells = [];
-      $DB::single = 2;
   $board->ShiftInPlace( $actualDir, $newCardCells );
 
   # Get the new card location.
@@ -156,7 +155,7 @@ REDO:
   }
   $deck->RemoveCard($newCardValue);
   my $cell = $newCardCells->[$newCardIndex];
-  vec( $board->{_board}, $cell->X + 4 * $cell->Y, 4 ) = $newCardValue;
+  vec( $board->{board}, $cell->X + 4 * $cell->Y, 4 ) = $newCardValue;
 
   push @$boardsStack, $board;
   push @$decksStack,  $deck;

@@ -1,7 +1,14 @@
 # Stores a 2-dimensional point or displacement in space as two integer values.
 package Threesus::V2D;
-use v5.14;
-use Object::Tiny qw{ X Y };
+use strict;
+use warnings;
+
+sub new {
+  my $class = shift;
+  bless { @_ }, $class;
+}
+sub X { return $_[0]->{X} }
+sub Y { return $_[0]->{Y} }
 
 ## Returns whether this IntVector2D is equal to the specified object.
 #public override bool Equals(object obj)
