@@ -11,11 +11,11 @@ use List::MoreUtils qw{firstidx};
 use Carp;
 
 use IO::Prompter <<EOD;
-..3.
-3123
-.12.
-..13
-2
+2.2.
+.3.3
+3..2
+.311
+1
 EOD
 
 use enum qw{Zero One Two Three Bonus};
@@ -66,7 +66,7 @@ REDO:
   say("--------------------");
   for my $y ( 0 .. $board->Height - 1 ) {
     for my $x ( 0 .. $board->Width - 1 ) {
-      my $c = $board->GetCardIndex( $x, $y );
+      my $c = $board->GetCardIndexValue( $x, $y );
       if ($c) {
         printf( "%d,", $c );
       } else {
@@ -115,6 +115,7 @@ REDO:
 # }
 # while(actualDir == null);*/
   my $newCardCells = [];
+      $DB::single = 2;
   $board->ShiftInPlace( $actualDir, $newCardCells );
 
   # Get the new card location.
@@ -146,6 +147,7 @@ REDO:
 
   # Get new card value.
   my $newCardValue;
+      $DB::single = 2;
   if ( $nextCardHint == Bonus ) {
     do {
     } unless ( $newCardValue = GetNewCardValue() );
@@ -158,7 +160,6 @@ REDO:
 
   push @$boardsStack, $board;
   push @$decksStack,  $deck;
-  exit;
 }
 
 say( "FINAL SCORE IS %d.", $board->GetTotalScore );

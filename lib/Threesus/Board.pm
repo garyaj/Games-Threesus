@@ -117,6 +117,13 @@ sub GetCardIndex {
   return vec($self->_board, $x + 4 * $y, 4);
 }
 
+# Returns the card index of the card at the specified x, y cooords.
+# 0 means no card there.
+sub GetCardIndexValue {
+  my ($self, $x, $y) = @_;
+  return $CARD_INDEX_TO_VALUE[$self->GetCardIndex($x, $y)];
+}
+
 # Returns the card index of the card at the specified cell.
 # 0 means no card there.
 sub GetCardIndexFromCell {
@@ -166,9 +173,7 @@ sub ToString {
   my $str = '';
   for my $y ( 0 .. $self->Height-1) {
     for my $x ( 0 .. $self->Width-1) {
-      my $cardIndex = $self->GetCardIndex($x, $y);
-      my $value = @CARD_INDEX_TO_VALUE[$cardIndex];
-      push @vals, $value;
+      push @vals, $self->GetCardIndexValue($x, $y);
     }
     $str .= join ", ", @vals;
     $str .= "\n";
